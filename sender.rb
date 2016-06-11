@@ -11,11 +11,41 @@ def log msg
   puts msg
 end
 
+module Limiter
+  def self.with_hipchat_backoff &blk
+    Reattempter.reattempt(3, 60, HipChat::TooManyRequests) do
+      blk.call
+    end
+  end
+end
+
+module Reattempter
+  def self.reattempt times, sleep_time=0, to_catch=Exception, &blk
+    begin
+      blk.call
+    rescue to_catch => ex
+      log "exception caught: #{ex}"
+      if times > 0
+        log "retrying"
+        if sleep_time > 0
+          log "sleeping: #{sleep_time}"
+          sleep sleep_time
+        end
+        times -= 1
+        retry
+      else
+        log "reraising"
+        raise
+      end
+    end
+  end
+end
+
 class Poller
 
   attr_reader :last_id
 
-  def initialize hipchat_client, room_name, last_id=nil, sleep_time=5
+  def initialize hipchat_client, room_name, last_id=nil, sleep_time=1
     @hipchat_client = hipchat_client
     @sleep_time = sleep_time
     @room_name = room_name
@@ -25,8 +55,8 @@ class Poller
 
   def poll &blk
     loop do
-      begin
-        log "polling: #{@room_name}"
+      log "polling: #{@room_name}"
+      Limiter.with_hipchat_backoff do
         new_messages(@room_name).each do |message|
           blk.call message
           self.last_id = message['id']
@@ -38,12 +68,15 @@ class Poller
 
   def rooms_last_id
     log "getting last_id from #{@room_name}"
-    last_id = (JSON.parse(
-               @hipchat_client[@room_name]
-                .history(:'max-results'=>10))['items']
-                .select { |m| m['type'] == 'message' }
-                .last || {})['id']
-    log "last_id: #{last_id}"
+    last_id = nil
+    Limiter.with_hipchat_backoff do
+      last_id = (JSON.parse(
+                 @hipchat_client[@room_name]
+                  .history(:'max-results'=>10))['items']
+                  .select { |m| m['type'] == 'message' }
+                  .last || {})['id']
+      log "last_id: #{last_id}"
+    end
     last_id
   end
 
@@ -83,7 +116,7 @@ class Pusher
   def push message
     log "pushing message to target"
     r = nil
-    reattempt(3,5) do
+    Reattempter.reattempt(3,5) do
       r = HTTParty.post(@target_href, body: message.to_json)
       unless (200..299).include? r.code
         log "status code not good: #{r.code}"
@@ -97,25 +130,6 @@ class Pusher
 
   protected
 
-  def reattempt times, sleep_time=0, &blk
-    begin
-      blk.call
-    rescue Exception => ex
-      log "exception caught: #{ex}"
-      if times > 0
-        log "retrying"
-        if sleep_time > 0
-          log "sleeping: #{sleep_time}"
-          sleep sleep_time
-        end
-        times -= 1
-        retry
-      else
-        log "reraising"
-        raise
-      end
-    end
-  end
 end
 
 class State
@@ -141,6 +155,7 @@ HIPCHAT_ROOM_NAME = ENV['HIPCHAT_ROOM_NAME']
 HIPCHAT_API_KEY = ENV['HIPCHAT_API_KEY']
 HIPCHAT_SENDER = ENV['HIPCHAT_SENDER']
 MESSAGE_TARGET = ENV['MESSAGE_TARGET']
+POLL_DELAY = (ENV['POLL_DELAY'] || 5).to_i
 log "room: #{HIPCHAT_ROOM_NAME}"
 log "api_key: ...#{HIPCHAT_API_KEY[-5..-1]}"
 log "sender: #{HIPCHAT_SENDER}"
@@ -154,7 +169,7 @@ hipchat_client = HipChat::Client.new(HIPCHAT_API_KEY, :api_version => 'v2')
 pusher = Pusher.new(MESSAGE_TARGET)
 log "starting poller"
 log "seeding poller at last_id: #{state['last_id']}" if state['last_id']
-poller = Poller.new(hipchat_client, HIPCHAT_ROOM_NAME, state['last_id'])
+poller = Poller.new(hipchat_client, HIPCHAT_ROOM_NAME, state['last_id'], POLL_DELAY)
 poller.on_last_id_change { |last_id| state['last_id'] = last_id }
 poller.poll do |message|
   begin

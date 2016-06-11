@@ -15,7 +15,7 @@ def log msg
 end
 
 module Subscription
-  POSSIBLE_OPTIONS = %w{ api_key room sender target  }
+  POSSIBLE_OPTIONS = %w{ api_key room sender target poll_delay }
   def self.from_options sub_options
     OpenStruct.new(Hash[
       POSSIBLE_OPTIONS.map { |o| [o, sub_options[o]] }
@@ -28,11 +28,13 @@ class BridgeProcess
     new subscription.api_key,
         subscription.room,
         subscription.sender,
-        subscription.target
+        subscription.target,
+        subscription.poll_delay
   end
 
-  def initialize api_key, room, sender, target
+  def initialize api_key, room, sender, target, poll_delay
     @api_key, @room, @sender, @target = api_key, room, sender, target
+    @poll_delay = poll_delay
   end
 
   def start
@@ -76,7 +78,8 @@ class BridgeProcess
         "HIPCHAT_ROOM_NAME=#{@room}",
         "HIPCHAT_API_KEY=#{@api_key}",
         "HIPCHAT_SENDER=#{@sender}",
-        "MESSAGE_TARGET=#{@target}"
+        "MESSAGE_TARGET=#{@target}",
+        "POLL_DELAY=#{@poll_delay}"
       ],
       'Labels' => labels
     })
@@ -108,6 +111,14 @@ post "/add_subscription" do
   data_in = JSON.parse(request.body.read)
   subscription = Subscription.from_options(data_in)
   log "subscription: #{subscription}"
+  subscription.room or
+    (log "failed req: missing room" and halt 400, "missing room")
+  subscription.sender or
+    (log "failed req: missing sender" and halt 400, "missing sender")
+  subscription.api_key or
+    (log "failed req: missing api_key" and halt 400, "missing api_key")
+  subscription.target or
+    (log "failed req: missing target" and halt 400, "missing target")
   bridge = BridgeProcess.for_subscription subscription
   started = bridge.start
   forward_url = "/check_subscription?#{URI.encode_www_form(subscription.to_h)}"
