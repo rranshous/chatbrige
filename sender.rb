@@ -5,6 +5,7 @@ require 'docker'
 require 'localmemcache'
 require 'json'
 
+$stdout.sync = true
 
 def log msg
   puts msg
@@ -36,13 +37,13 @@ class Poller
   end
 
   def rooms_last_id
-    puts "getting last_id from #{@room_name}"
+    log "getting last_id from #{@room_name}"
     last_id = (JSON.parse(
                @hipchat_client[@room_name]
                 .history(:'max-results'=>10))['items']
                 .select { |m| m['type'] == 'message' }
                 .last || {})['id']
-    puts "last_id: #{last_id}"
+    log "last_id: #{last_id}"
     last_id
   end
 
@@ -59,16 +60,16 @@ class Poller
                  .recent_history(:'not-before'=>@last_id))['items']
                  .select { |m| m['type'] == 'message' }
     messages = messages[1..-1] || []
-    puts "messages found #{messages.length}"
+    log "messages found #{messages.length}"
     messages
   end
 
 
   def last_id= value
-    puts "setting last_id: #{value}"
+    log "setting last_id: #{value}"
     @last_id = value
     if @last_id_change_callback
-      puts "calling callback"
+      log "calling callback"
       @last_id_change_callback.call @last_id
     end
   end
@@ -119,9 +120,9 @@ end
 
 class State
   def initialize path
-    puts "loading or creating state: #{path}"
+    log "loading or creating state: #{path}"
     @store = LocalMemCache.new(:filename => path)
-    puts "state loaded"
+    log "state loaded"
   end
 
   def [] key
