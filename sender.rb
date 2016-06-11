@@ -185,8 +185,10 @@ poller.poll do |message|
     log "going to send response: #{response_data}"
     log "message: #{response_data['message']}"
     msg, format = response_data['message'], response_data['format']
-    hipchat_client[HIPCHAT_ROOM_NAME].send(HIPCHAT_SENDER, msg,
-                                           'message_format' => format)
+    unless msg.nil? || msg.empty?
+      hipchat_client[HIPCHAT_ROOM_NAME].send(HIPCHAT_SENDER, msg,
+                                             'message_format' => format)
+    end
   rescue Exception => ex
     log "Toplvl Exception: #{ex}"
     raise
