@@ -7,11 +7,13 @@ dependencies:
     - docker info
     - docker build -t rranshous/chatbridge_sender -f Dockerfile-sender .
     - docker build -t rranshous/chatbridge_subscription_manager -f Dockerfile-subscription_manager .
+    - docker build -t rranshous/chatbridge_receiver -f Dockerfile-receiver .
 
 test:
   override:
     - docker run -d -p 8080:80 rranshous/chatbridge_subscription_manager
     - docker run -d -p 8080:80 rranshous/chatbridge_sender
+    - docker run -d -p 8080:80 rranshous/chatbridge_receiver
 
 deployment:
   hub:
@@ -20,3 +22,4 @@ deployment:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
       - docker push rranshous/chatbridge_sender
       - docker push rranshous/chatbridge_subscription_manager
+      - docker push rranshous/chatbridge_receiver
