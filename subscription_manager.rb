@@ -32,7 +32,12 @@ class BridgeProcess
     image = Docker::Image.create('fromImage' => DOCKER_IMAGE_NAME)
     Docker::Container.create({
       'Image' => image.id,
-      'Env' => []
+      'Env' => [
+        "HIPCHAT_ROOM_NAME=#{@room}",
+        "HIPCHAT_API_KEY=#{@api_key}",
+        "HIPCHAT_SENDER=#{@sender}",
+        "HIPCHAT_TARGET=#{@target}"
+      ]
     })
   end
 end

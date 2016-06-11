@@ -2,6 +2,9 @@
 
 require 'hipchat'
 require 'docker'
+require 'localmemcache'
+require 'json'
+
 
 def log msg
   puts msg
@@ -9,11 +12,14 @@ end
 
 class Poller
 
-  def initialize hipchat_client, room_name, sleep_time=5
+  attr_reader :last_id
+
+  def initialize hipchat_client, room_name, last_id=nil, sleep_time=5
     @hipchat_client = hipchat_client
     @sleep_time = sleep_time
     @room_name = room_name
-    @last_id = rooms_last_id
+    @last_id = last_id || rooms_last_id
+    @last_id_change_callback = nil
   end
 
   def poll &blk
@@ -40,6 +46,10 @@ class Poller
     last_id
   end
 
+  def on_last_id_change &blk
+    @last_id_change_callback = blk
+  end
+
   protected
 
   def new_messages room_name
@@ -57,6 +67,10 @@ class Poller
   def last_id= value
     puts "setting last_id: #{value}"
     @last_id = value
+    if @last_id_change_callback
+      puts "calling callback"
+      @last_id_change_callback.call @last_id
+    end
   end
 end
 
@@ -103,29 +117,53 @@ class Pusher
   end
 end
 
+class State
+  def initialize path
+    puts "loading or creating state: #{path}"
+    @store = LocalMemCache.new(:filename => path)
+    puts "state loaded"
+  end
 
-ROOM_NAME = ENV['HIPCHAT_ROOM_NAME']
-API_KEY = ENV['HIPCHAT_API_KEY']
+  def [] key
+    JSON.load(@store[key])
+  end
+
+  def []= key, value
+    log "updating state: #{key} => #{value}"
+    @store[key] = value.to_json
+  end
+end
+
+
+STATE_DATA_DIR = ENV['STATE_DATA_DIR']
+HIPCHAT_ROOM_NAME = ENV['HIPCHAT_ROOM_NAME']
+HIPCHAT_API_KEY = ENV['HIPCHAT_API_KEY']
 HIPCHAT_SENDER = ENV['HIPCHAT_SENDER']
 MESSAGE_TARGET = ENV['MESSAGE_TARGET']
-log "room: #{ROOM_NAME}"
-log "api_key: #{API_KEY[-5..-1]}"
+log "room: #{HIPCHAT_ROOM_NAME}"
+log "api_key: ...#{HIPCHAT_API_KEY[-5..-1]}"
 log "sender: #{HIPCHAT_SENDER}"
 log "target: #{MESSAGE_TARGET}"
+log "state dir: #{STATE_DATA_DIR}"
 log "getting last message"
 
-hipchat_client = HipChat::Client.new(API_KEY, :api_version => 'v2')
+state = State.new File.join(STATE_DATA_DIR, 'sender.lmc')
+
+hipchat_client = HipChat::Client.new(HIPCHAT_API_KEY, :api_version => 'v2')
 pusher = Pusher.new(MESSAGE_TARGET)
 log "starting poller"
-Poller.new(hipchat_client, ROOM_NAME).poll do |message|
+log "seeding poller at last_id: #{state['last_id']}" if state['last_id']
+poller = Poller.new(hipchat_client, HIPCHAT_ROOM_NAME, state['last_id'])
+poller.on_last_id_change { |last_id| state['last_id'] = last_id }
+poller.poll do |message|
   begin
     log "going to push message: #{message['message']}"
     response_data = pusher.push message
     log "going to send response: #{response_data}"
     log "message: #{response_data['message']}"
-    hipchat_client[ROOM_NAME].send(HIPCHAT_SENDER,
-                                   response_data['message'],
-                                   'message_format' => response_data['format'])
+    msg, format = response_data['message'], response_data['format']
+    hipchat_client[HIPCHAT_ROOM_NAME].send(HIPCHAT_SENDER, msg,
+                                           'message_format' => format)
   rescue Exception => ex
     log "Toplvl Exception: #{ex}"
     raise

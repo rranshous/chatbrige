@@ -7,7 +7,10 @@ RUN bundle install --system
 ENTRYPOINT ["bundle", "exec"]
 CMD ["./sender.rb"]
 
+VOLUME /data
+
 ENV HIPCHAT_ROOM_NAME test
 ENV API_KEY setme
 ENV HIPCHAT_SENDER bot
 ENV MESSAGE_TARGET setme
+ENV STATE_DATA_DIR /data
