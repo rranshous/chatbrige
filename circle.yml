@@ -13,6 +13,7 @@ test:
     - docker run --name chatbridge_subscription_manager -d -p 8080:80 rranshous/chatbridge_subscription_manager && sleep 10
     - docker logs chatbridge_subscription_manager
     - curl --retry 10 --retry-delay 5 -v http://localhost:8080
+    - docker logs chatbridge_subscription_manager
 
 deployment:
   hub:
@@ -20,4 +21,4 @@ deployment:
     commands:
       - docker login -e $DOCKER_EMAIL -u $DOCKER_USER -p $DOCKER_PASS
       - docker push rranshous/chatbridge_sender
-      - docker push rranshous/chatbridge_ssubscription_manager
+      - docker push rranshous/chatbridge_subscription_manager
