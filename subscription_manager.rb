@@ -9,6 +9,7 @@ require 'pry'
 $stdout.sync = true
 
 DOCKER_IMAGE_NAME = ENV['DOCKER_IMAGE_NAME']
+puts "docker_image_name: #{DOCKER_IMAGE_NAME}"
 
 def log msg
   puts msg
@@ -42,7 +43,7 @@ class BridgeProcess
   end
 
   def stop
-    kill_container
+    kill_and_delete_container
   end
 
   def is_running?
@@ -90,10 +91,11 @@ class BridgeProcess
     true
   end
 
-  def kill_container
+  def kill_and_delete_container
     container = find_container
     return false unless container
     container.kill
+    container.delete
     true
   end
 

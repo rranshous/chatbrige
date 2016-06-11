@@ -61,6 +61,7 @@ class Poller
           blk.call message
           self.last_id = message['id']
         end
+        puts "sleeping: #{@sleep_time}"
         sleep @sleep_time
       end
     end
@@ -155,12 +156,18 @@ HIPCHAT_ROOM_NAME = ENV['HIPCHAT_ROOM_NAME']
 HIPCHAT_API_KEY = ENV['HIPCHAT_API_KEY']
 HIPCHAT_SENDER = ENV['HIPCHAT_SENDER']
 MESSAGE_TARGET = ENV['MESSAGE_TARGET']
-POLL_DELAY = (ENV['POLL_DELAY'] || 5).to_i
+POLL_DELAY = ENV['POLL_DELAY'].to_i
+if POLL_DELAY == 0
+  POLL_DELAY = 10
+  log "Poll time can not be zero, defaulting to 10"
+end
+
 log "room: #{HIPCHAT_ROOM_NAME}"
 log "api_key: ...#{HIPCHAT_API_KEY[-5..-1]}"
 log "sender: #{HIPCHAT_SENDER}"
 log "target: #{MESSAGE_TARGET}"
 log "state dir: #{STATE_DATA_DIR}"
+log "poll delay: #{POLL_DELAY}"
 log "getting last message"
 
 state = State.new File.join(STATE_DATA_DIR, 'sender.lmc')
