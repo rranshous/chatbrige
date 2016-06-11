@@ -10,7 +10,8 @@ dependencies:
 
 test:
   override:
-    - docker run -d -p 8080:80 rranshous/chatbridge_subscription_manager; sleep 10
+    - docker run --name chatbridge_subscription_manager -d -p 8080:80 rranshous/chatbridge_subscription_manager && sleep 10
+    - docker logs chatbridge_subscription_manager
     - curl --retry 10 --retry-delay 5 -v http://localhost:8080
 
 deployment:
