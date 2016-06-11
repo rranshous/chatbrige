@@ -38,6 +38,18 @@ class BridgeProcess
     start_container
   end
 
+  def is_running?
+    # check all the containers for a container whos labels match ours
+    # and than check if it's running
+    Docker::Container.all.each do |container|
+      container_json = container.json
+      if container_json["Config"]["Labels"] == labels
+        return container_json["State"]["Running"]
+      end
+    end
+    false
+  end
+
   private
   def start_container
     image = Docker::Image.create('fromImage' => DOCKER_IMAGE_NAME)
@@ -71,26 +83,25 @@ class BridgeProcess
       'message_target' => @target
     }
   end
-
-  def is_running?
-    # check all the containers for a container whos labels match ours
-    # and than check if it's running
-    Docker::Container.all.each do |container|
-      container_json = container.json
-      if container_json["Config"]["Labels"] == labels
-        return container_json["State"]["Running"]
-      end
-    end
-    false
-  end
 end
 
 post "/add_subscription" do
+  content_type :json
   data_in = JSON.parse(request.body.read)
   subscription = Subscription.from_options(data_in)
+  log "subscription: #{subscription}"
   bridge = BridgeProcess.for_subscription subscription
   started = bridge.start
-
-  content_type :json
   { started: started }.to_json
+end
+
+get "/check_subscription" do
+  content_type :json
+  subscription = Subscription.from_options(params)
+  log "subscription: #{subscription}"
+  bridge = BridgeProcess.for_subscription subscription
+  running = bridge.is_running?
+  log "running?: #{running}"
+
+  { running: running }.to_json
 end
