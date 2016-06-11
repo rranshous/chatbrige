@@ -9,17 +9,18 @@ end
 
 class Poller
 
-  def initialize hipchat_client, sleep_time=5
+  def initialize hipchat_client, room_name, sleep_time=5
     @hipchat_client = hipchat_client
     @sleep_time = sleep_time
-    @last_id = nil
+    @room_name = room_name
+    @last_id = rooms_last_id
   end
 
-  def poll room_name, &blk
+  def poll &blk
     loop do
       begin
-        log "polling"
-        new_messages.each do |message|
+        log "polling: #{@room_name}"
+        new_messages(@room_name).each do |message|
           blk.call message
           self.last_id = message['id']
         end
@@ -28,24 +29,24 @@ class Poller
     end
   end
 
-  def last_id
-    puts "getting last_id"
-    @last_id ||= JSON.parse(
-                  @hipchat_client[ROOM_NAME]
-                   .history(:'max-results'=>1))['items']
-                   .select { |m| m['type'] == 'message' }
-                   .last['id']
-    puts "last_id: #{@last_id}"
-    @last_id
+  def rooms_last_id
+    puts "getting last_id from #{@room_name}"
+    last_id = (JSON.parse(
+               @hipchat_client[@room_name]
+                .history(:'max-results'=>10))['items']
+                .select { |m| m['type'] == 'message' }
+                .last || {})['id']
+    puts "last_id: #{last_id}"
+    last_id
   end
 
   protected
 
-  def new_messages
+  def new_messages room_name
     log "polling for new messages"
     messages = JSON.parse(
-                @hipchat_client[ROOM_NAME]
-                 .recent_history(:'not-before'=>last_id))['items']
+                @hipchat_client[room_name]
+                 .recent_history(:'not-before'=>@last_id))['items']
                  .select { |m| m['type'] == 'message' }
     messages = messages[1..-1] || []
     puts "messages found #{messages.length}"
@@ -104,7 +105,7 @@ end
 
 
 ROOM_NAME = ENV['HIPCHAT_ROOM_NAME']
-API_KEY = ENV['API_KEY']
+API_KEY = ENV['HIPCHAT_API_KEY']
 HIPCHAT_SENDER = ENV['HIPCHAT_SENDER']
 MESSAGE_TARGET = ENV['MESSAGE_TARGET']
 log "room: #{ROOM_NAME}"
@@ -116,7 +117,7 @@ log "getting last message"
 hipchat_client = HipChat::Client.new(API_KEY, :api_version => 'v2')
 pusher = Pusher.new(MESSAGE_TARGET)
 log "starting poller"
-Poller.new(hipchat_client).poll(ROOM_NAME) do |message|
+Poller.new(hipchat_client, ROOM_NAME).poll do |message|
   begin
     log "going to push message: #{message['message']}"
     response_data = pusher.push message
