@@ -1,0 +1,8 @@
+
+subscription manager:
+ web app which allows users to set up new subscriptions to rooms
+  give it your API key, the room you want to watch, the 'sender' name to post under
+  and the target endpoint you want messages sent to and it'll send them to you
+
+sender:
+ container which polls the chat room, sends messages to endpoint and sends responses from target back to room
