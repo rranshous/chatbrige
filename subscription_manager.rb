@@ -3,6 +3,7 @@
 require 'sinatra'
 require 'json'
 require 'docker'
+require 'uri'
 require 'pry'
 
 $stdout.sync = true
@@ -38,19 +39,30 @@ class BridgeProcess
     start_container
   end
 
+  def stop
+    kill_container
+  end
+
   def is_running?
-    # check all the containers for a container whos labels match ours
-    # and than check if it's running
-    Docker::Container.all.each do |container|
-      container_json = container.json
-      if container_json["Config"]["Labels"] == labels
-        return container_json["State"]["Running"]
-      end
+    container = find_container
+    if container
+      container.json["State"]["Running"]
+    else
+      false
     end
-    false
   end
 
   private
+
+  def find_container
+    Docker::Container.all.each do |container|
+      if container.json["Config"]["Labels"] == labels
+        return container
+      end
+    end
+    nil
+  end
+
   def start_container
     image = Docker::Image.create('fromImage' => DOCKER_IMAGE_NAME)
     log "creating container: #{@room} => #{@target}"
@@ -75,6 +87,13 @@ class BridgeProcess
     true
   end
 
+  def kill_container
+    container = find_container
+    return false unless container
+    container.kill
+    true
+  end
+
   def labels
     {
       'hipchat_room' => @room,
@@ -86,22 +105,35 @@ class BridgeProcess
 end
 
 post "/add_subscription" do
-  content_type :json
   data_in = JSON.parse(request.body.read)
   subscription = Subscription.from_options(data_in)
   log "subscription: #{subscription}"
   bridge = BridgeProcess.for_subscription subscription
   started = bridge.start
-  { started: started }.to_json
+  forward_url = "/check_subscription?#{URI.encode_www_form(subscription.to_h)}"
+  if started
+    redirect forward_url, 201
+  else
+    redirect forward_url, 303
+  end
 end
 
 get "/check_subscription" do
-  content_type :json
   subscription = Subscription.from_options(params)
   log "subscription: #{subscription}"
   bridge = BridgeProcess.for_subscription subscription
   running = bridge.is_running?
   log "running?: #{running}"
-
+  content_type :json
   { running: running }.to_json
+end
+
+post "/remove_subscription" do
+  data_in = JSON.parse(request.body.read)
+  subscription = Subscription.from_options(data_in)
+  log "subscription: #{subscription}"
+  bridge = BridgeProcess.for_subscription subscription
+  bridge.stop
+  forward_url = "/check_subscription?#{URI.encode_www_form(subscription.to_h)}"
+  redirect forward_url, 303
 end
