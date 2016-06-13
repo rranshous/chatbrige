@@ -1,3 +1,12 @@
+what this software allows you to do:
+ build a web app which acts as a hipchat chat bot
+why do this?
+ we all know how to build web apps. platforms such as twilio have shown that
+ we can build reactive apps in this manner. make bots easier
+overview of how it works:
+ subscription manager web app docker container spawns sender docker containers.
+ senders do the work. all state is managed via docker.
+
 how to run:
 
 start a subscription manager processes. it's your api and admin interface
