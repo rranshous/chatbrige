@@ -1,3 +1,24 @@
+how to run:
+
+start a subscription manager processes. it's your api and admin interface
+for adding subscriptions.
+
+a subscription is a subscription to the messages in a room. adding a subscription
+causes messages from the room to be sent to the target href. The target
+can optionally return a message which will be sent back to the room under
+the alias of the sender.
+
+you don't start sender containers your self. they are started by the
+subscription manager.
+
+after you've started a subscription you should be able to run `docker ps` and
+see the sender docker container running on the system.
+
+there will be one sender docker container per subscription.
+
+if you are not running the subscription manager in it's docker container than
+be sure to set the DOCKER_IMAGE_NAME env variable. The docker container will
+default it for you to the public image of the sender (rranshous/chatbridge_sender)
 
 subscription manager:
  web app which allows users to set up new subscriptions to rooms
@@ -6,3 +27,7 @@ subscription manager:
 
 sender:
  container which polls the chat room, sends messages to endpoint and sends responses from target back to room
+
+receiver:
+ sample messages handler, has different endpoints for different types of responses.
+ set the target of your subscription to the receiver
