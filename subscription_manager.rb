@@ -52,9 +52,11 @@ class BridgeProcess
           else
             nil
           end
-        end.compact]
+        end]
+      else
+        nil
       end
-    end
+    end.compact
   end
 
   attr_reader :api_key, :room, :sender, :target, :poll_delay
