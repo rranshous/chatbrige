@@ -103,6 +103,7 @@ class BridgeProcess
       return false
     end
     container = Docker::Container.create({
+      'RestartPolicy' => { 'Name': 'always' },
       'Image' => image.id,
       'Env' => [
         "HIPCHAT_ROOM_NAME=#{@room}",
