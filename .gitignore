@@ -1,2 +1,4 @@
 .env
 *.lmc
+*.swp
+*.swo

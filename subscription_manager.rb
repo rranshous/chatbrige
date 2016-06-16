@@ -83,6 +83,10 @@ class BridgeProcess
     end
   end
 
+  def recent_logs
+    container_logs
+  end
+
   private
 
   def find_container
@@ -119,6 +123,12 @@ class BridgeProcess
     container.start
     log "container started"
     true
+  end
+
+  def container_logs
+    container = find_container
+    return nil unless container
+    container.streaming_logs(stdout: 1, stderr: 1, tail: 100, follow: 0).to_s
   end
 
   def kill_and_delete_container
@@ -193,6 +203,16 @@ get "/check_subscription" do
   log "running?: #{running}"
   content_type :json
   { running: running }.to_json
+end
+
+get '/subscription_logs' do
+  subscription = Subscription.from_options(params)
+  log "subscription: #{subscription}"
+  bridge = BridgeProcess.from_subscription subscription
+  running = bridge.is_running?
+  log "running?: #{running}"
+  content_type :text
+  bridge.recent_logs
 end
 
 get "/" do

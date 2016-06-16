@@ -26,6 +26,9 @@
           <input type="submit" name="remove" value="remove"/>
         </form>
       </td>
+      <td>
+	<a href="/subscription_logs?room=<%= bridge.room %>&sender=<%= bridge.sender %>&api_key=<%= bridge.api_key %>&target=<%= bridge.target %>&poll_delay=<%= bridge.poll_delay %>">logs</a>
+      </td>
     </tr>
   <% end %>
 
